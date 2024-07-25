@@ -1,0 +1,90 @@
+---
+title: "HIV cascade"
+author: "Xueer Zhang"
+date: "2023-12-6"
+output: html_document
+---
+
+```{r}
+# Clear environment
+rm(list=ls())
+
+# Load r packages
+library("tidyverse", quietly = T)
+library("lubridate", quietly = T)
+```
+
+```{r}
+# Define cutpoint and state
+cutpoint1 <- c('0','70', '80', '90')
+analysis1 <- c('overall', 'midwest', 'northeast', 'south', 'west',  'F', 'M', 'white', 'black', 'hisp')
+```
+
+```{r}
+# Function
+for (cutpoint in cutpoint1){
+  
+  for (analysis in analysis1){
+    
+    # Read in results
+    if (analysis=="overall") {
+      res <- read_csv(paste0("C:/Users/xzhan280/OneDrive - Johns Hopkins/DA/Cascade - 0928/medican-care_results/mpr", cutpoint, "/risk_crude.csv"))
+      } else {
+        res <- read_csv(paste0("C:/Users/xzhan280/OneDrive - Johns Hopkins/DA/Cascade - 0928/medican-care_results/mpr", cutpoint, "/risk_crude_", analysis,".csv")) 
+      }
+    
+    # Convert 'time' to a date using July 1, 2001, as the starting date
+    res$time <- as.Date("2001-07-01") + res$time
+    
+    # Extract year from the 'time' column
+    res$year <- year(res$time)
+    
+    # Functions to process results
+    risk_year <- function(dat, years_of_interest) {
+      
+      by_year <- function(t) {
+      temp <- filter(dat, floor(year)==t) %>% 
+      mutate(risk_nrna = round(est4*100, 1),
+             risk_nrna_CI = paste0("(", format(round(est4*100 - se4*1.96*100, 1), nsmall=1), ", ",
+                             format(round(est4*100 + se4*1.96*100, 1), nsmall=1),")"),
+             
+             risk_rna = round(est2*100, 1),
+             risk_rna_CI = paste0("(", format(round(est2*100 - se2*1.96*100, 1), nsmall=1), ", ",
+                             format(round(est2*100 + se2*1.96*100, 1), nsmall=1),")"),
+             
+             risk_nra = round(est3*100, 1),
+             risk_nra_CI = paste0("(", format(round(est3*100 - se3*1.96*100, 1), nsmall=1), ", ",
+                             format(round(est3*100 + se3*1.96*100, 1), nsmall=1),")"),
+             
+             risk_ra = round(est1*100, 1),
+             risk_ra_CI = paste0("(", format(round(est1*100 - se1*1.96*100, 1), nsmall=1), ", ",
+                             format(round(est1*100 + se1*1.96*100, 1), nsmall=1),")"),
+             
+             risk_dead = round(est5*100, 1),
+             risk_dead_CI = paste0("(", format(round(est5*100 - se5*1.96*100, 1), nsmall=1), ", ",
+                             format(round(est5*100 + se5*1.96*100, 1), nsmall=1),")"),
+
+             year = t) %>% 
+        filter(!duplicated(year, fromLast=T)) %>% 
+        select(year, risk_nrna, risk_nrna_CI, risk_rna, risk_rna_CI, risk_nra, risk_nra_CI, risk_ra, risk_ra_CI, risk_dead, risk_dead_CI)
+      }
+      new.dat <- bind_rows(lapply(years_of_interest, function(x){by_year(x)}))
+      
+      return(new.dat)
+    }
+    
+    # Weighted analysis
+    years_of_interest <- risk_year(res, c(2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015))
+    
+    # Export csv
+    if (analysis=="overall") {
+      name <- paste0("C:/Users/xzhan280/OneDrive - Johns Hopkins/DA/Cascade - 0928/medican-care_results/tables/mpr", cutpoint, "/table_mpr", cutpoint, "_crude.csv")
+      } else {
+        name <- paste0("C:/Users/xzhan280/OneDrive - Johns Hopkins/DA/Cascade - 0928/medican-care_results/tables/mpr", cutpoint, "/table_mpr", cutpoint, "_crude_", analysis,".csv")
+        }
+    write_csv(years_of_interest, name)
+    
+  }
+}
+```
+
